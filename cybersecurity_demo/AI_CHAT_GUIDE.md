@@ -29,8 +29,8 @@ http://localhost:5001/chat
 ไฟล์ `.env` ในโฟลเดอร์ `cybersecurity_demo/`:
 
 ```env
-OPENROUTER_API_KEY=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
-OPENROUTER_MODEL=meta-llama/llama-3.2-3b-instruct:free
+OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_MODEL=openai/gpt-4o-mini
 ```
 
 ### 2. Dependencies

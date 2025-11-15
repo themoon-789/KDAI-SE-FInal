@@ -11,7 +11,7 @@ class GraylogClient:
     def __init__(self, 
                  host="10.10.89.6",
                  port=9000,
-                 api_token="1mgsuklifemsj5p9di7ghi0dsn6eeipet37d66efo3umkk1buivc",
+                 api_token=None,
                  stream_name="FortiGate Syslog"):
         """
         เชื่อมต่อกับ Graylog Server
