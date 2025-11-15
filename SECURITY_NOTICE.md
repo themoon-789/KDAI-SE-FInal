@@ -41,14 +41,14 @@ API keys were accidentally committed to the repository in the initial commit.
 **OpenRouter:**
 1. Login to https://openrouter.ai/
 2. Go to Settings → API Keys
-3. Delete the exposed key: `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`
+3. Delete the exposed key (check Git history for the key value)
 4. Generate new API key
 5. Update `.env` file locally (DO NOT commit)
 
 **Graylog:**
 1. Login to Graylog server
 2. Go to System → Users → Edit Tokens
-3. Delete the exposed token: `1mgsuklifemsj5p9di7ghi0dsn6eeipet37d66efo3umkk1buivc`
+3. Delete the exposed token (check Git history for the token value)
 4. Generate new token
 5. Update `.env` file locally (DO NOT commit)
 
