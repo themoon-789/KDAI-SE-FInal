@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+
+{% block title %}Agent Management - Cybersecurity Agent{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="text-white mb-4"><i class="bi bi-cpu"></i> Agent Management</h1>
+    <p class="text-white-50">UC-ADM-02: ตั้งค่าและจัดการ Agents สำหรับรับข้อมูล Syslog</p>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-list"></i> รายการ Agents</h5>
+                </div>
+                <div class="card-body">
+                    <div id="agents-list">
+                        <p class="text-center text-muted">กำลังโหลด...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-gear"></i> ตั้งค่า Agent</h5>
+                </div>
+                <div class="card-body">
+                    <form id="config-form">
+                        <input type="hidden" id="agent-id">
+                        
+                        <div class="mb-3">
+                            <label class="form-label">ชื่อ Agent</label>
+                            <input type="text" class="form-control" id="agent-name" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">IP Address</label>
+                            <input type="text" class="form-control" id="agent-ip" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">โปรโตคอล</label>
+                            <select class="form-select" id="agent-protocol">
+                                <option value="UDP">UDP</option>
+                                <option value="TCP">TCP</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">พอร์ต</label>
+                            <input type="number" class="form-control" id="agent-port" value="514">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            <i class="bi bi-save"></i> บันทึกการตั้งค่า
+                        </button>
+                    </form>
+
+                    <div id="config-status" class="mt-3"></div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> คำแนะนำ</h6>
+                </div>
+                <div class="card-body">
+                    <small>
+                        <p><strong>UDP (Port 514):</strong> เหมาะสำหรับ Syslog ทั่วไป รวดเร็ว</p>
+                        <p><strong>TCP (Port 514):</strong> เหมาะสำหรับข้อมูลสำคัญ มีการยืนยัน</p>
+                        <p class="mb-0">คลิกที่ Agent เพื่อตั้งค่า</p>
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-diagram-3"></i> สถาปัตยกรรมระบบ</h5>
+                </div>
+                <div class="card-body">
+                    <div class="text-center">
+                        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='800' height='300'%3E%3Crect width='800' height='300' fill='%23f8f9fa'/%3E%3Ctext x='400' y='150' font-family='Arial' font-size='20' text-anchor='middle' fill='%23666'%3E%5BDiagram: Agents → Syslog Collector → Database → Dashboard%5D%3C/text%3E%3C/svg%3E" 
+                             alt="System Architecture" class="img-fluid">
+                        <p class="text-muted mt-2">
+                            <small>Agents รวบรวม Syslog จากอุปกรณ์ → ส่งไปยัง Collector → จัดเก็บใน Database → แสดงผลบน Dashboard</small>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let agents = [];
+
+    function loadAgents() {
+        fetch('/api/agents')
+            .then(res => res.json())
+            .then(data => {
+                agents = data;
+                displayAgents(data);
+            });
+    }
+
+    function displayAgents(agentsList) {
+        const container = document.getElementById('agents-list');
+        
+        container.innerHTML = agentsList.map(agent => {
+            const statusClass = agent.status === 'active' ? 'success' : 'secondary';
+            const statusIcon = agent.status === 'active' ? 'check-circle-fill' : 'x-circle-fill';
+            
+            return `
+                <div class="card mb-3 agent-card" onclick="selectAgent(${agent.id})" style="cursor: pointer;">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="mb-1">
+                                    <i class="bi bi-${statusIcon} text-${statusClass}"></i>
+                                    ${agent.name}
+                                </h6>
+                                <p class="mb-0 text-muted">
+                                    <small>
+                                        <i class="bi bi-hdd-network"></i> ${agent.ip}
+                                        ${agent.protocol ? `| ${agent.protocol}:${agent.port}` : ''}
+                                    </small>
+                                </p>
+                            </div>
+                            <div>
+                                <span class="badge bg-${statusClass}">
+                                    ${agent.status === 'active' ? 'Active' : 'Inactive'}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    function selectAgent(agentId) {
+        const agent = agents.find(a => a.id === agentId);
+        if (!agent) return;
+
+        document.getElementById('agent-id').value = agent.id;
+        document.getElementById('agent-name').value = agent.name;
+        document.getElementById('agent-ip').value = agent.ip;
+        document.getElementById('agent-protocol').value = agent.protocol || 'UDP';
+        document.getElementById('agent-port').value = agent.port || 514;
+
+        // Highlight selected
+        document.querySelectorAll('.agent-card').forEach(card => {
+            card.style.border = '1px solid #dee2e6';
+        });
+        event.currentTarget.style.border = '2px solid #667eea';
+    }
+
+    document.getElementById('config-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        const agentId = document.getElementById('agent-id').value;
+        if (!agentId) {
+            alert('กรุณาเลือก Agent ที่ต้องการตั้งค่า');
+            return;
+        }
+
+        const config = {
+            protocol: document.getElementById('agent-protocol').value,
+            port: parseInt(document.getElementById('agent-port').value)
+        };
+
+        const statusDiv = document.getElementById('config-status');
+        statusDiv.innerHTML = `
+            <div class="alert alert-info">
+                <i class="bi bi-hourglass-split"></i> กำลังบันทึกการตั้งค่า...
+            </div>
+        `;
+
+        fetch(`/api/agents/${agentId}/configure`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(config)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                statusDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        <i class="bi bi-check-circle"></i> ${data.message}
+                    </div>
+                `;
+                loadAgents();
+                
+                setTimeout(() => {
+                    statusDiv.innerHTML = '';
+                }, 3000);
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="bi bi-x-circle"></i> เกิดข้อผิดพลาด
+                    </div>
+                `;
+            }
+        })
+        .catch(error => {
+            statusDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="bi bi-x-circle"></i> เกิดข้อผิดพลาด: ${error.message}
+                </div>
+            `;
+        });
+    });
+
+    // โหลดข้อมูลเริ่มต้น
+    loadAgents();
+</script>
+{% endblock %}

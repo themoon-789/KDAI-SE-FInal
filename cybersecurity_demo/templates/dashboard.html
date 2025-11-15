@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - Cybersecurity Agent{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="text-white mb-4"><i class="bi bi-speedometer2"></i> Real-time Dashboard</h1>
+    <p class="text-white-50">UC-ADM-03: ติดตามสถานะระบบแบบ Real-time (อัปเดตทุก 5 นาที)</p>
+
+    <!-- สถิติภาพรวม -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon text-primary">
+                    <i class="bi bi-book-fill"></i>
+                </div>
+                <h3 id="stat-documents">0</h3>
+                <p class="text-muted mb-0">เอกสารใน Knowledge Base</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon text-success">
+                    <i class="bi bi-file-text-fill"></i>
+                </div>
+                <h3 id="stat-logs">0</h3>
+                <p class="text-muted mb-0">Logs ที่รวบรวม</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon text-info">
+                    <i class="bi bi-cpu-fill"></i>
+                </div>
+                <h3 id="stat-agents">0</h3>
+                <p class="text-muted mb-0">Active Agents</p>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="stat-card">
+                <div class="stat-icon text-warning">
+                    <i class="bi bi-heart-pulse-fill"></i>
+                </div>
+                <h3 id="stat-health">0%</h3>
+                <p class="text-muted mb-0">System Health</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Real-time Logs -->
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-activity"></i> Real-time Logs</h5>
+                </div>
+                <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>เวลา</th>
+                                <th>แหล่งที่มา</th>
+                                <th>ระดับ</th>
+                                <th>ข้อความ</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table">
+                            <tr>
+                                <td colspan="4" class="text-center text-muted">
+                                    <i class="bi bi-hourglass-split"></i> รอข้อมูล...
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-cpu"></i> Agent Status</h5>
+                </div>
+                <div class="card-body">
+                    <div id="agents-list">
+                        <p class="text-muted text-center">กำลังโหลด...</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-info-circle"></i> System Info</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Last Update:</strong> <span id="last-update">-</span></p>
+                    <p><strong>Auto Refresh:</strong> <span class="badge bg-success">Enabled (5 min)</span></p>
+                    <p class="mb-0"><strong>Status:</strong> <span class="badge bg-success">Online</span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    const socket = io();
+
+    // อัปเดตสถิติ
+    socket.on('stats_update', function(stats) {
+        document.getElementById('stat-documents').textContent = stats.total_documents;
+        document.getElementById('stat-logs').textContent = stats.total_logs;
+        document.getElementById('stat-agents').textContent = stats.active_agents;
+        document.getElementById('stat-health').textContent = stats.system_health + '%';
+        document.getElementById('last-update').textContent = new Date().toLocaleString('th-TH');
+    });
+
+    // รับ log ใหม่แบบ Real-time
+    socket.on('new_log', function(log) {
+        const tbody = document.getElementById('logs-table');
+        
+        // ลบข้อความ "รอข้อมูล" ถ้ามี
+        if (tbody.children.length === 1 && tbody.children[0].children.length === 1) {
+            tbody.innerHTML = '';
+        }
+
+        const severityClass = {
+            'INFO': 'text-info',
+            'WARNING': 'text-warning',
+            'CRITICAL': 'text-danger'
+        };
+
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${log.timestamp}</td>
+            <td><span class="badge bg-secondary">${log.source}</span></td>
+            <td><span class="badge ${severityClass[log.severity] || ''}">${log.severity}</span></td>
+            <td>${log.message}</td>
+        `;
+        
+        tbody.insertBefore(row, tbody.firstChild);
+        
+        // เก็บแค่ 20 รายการล่าสุด
+        while (tbody.children.length > 20) {
+            tbody.removeChild(tbody.lastChild);
+        }
+    });
+
+    // โหลดข้อมูล Agents
+    fetch('/api/agents')
+        .then(res => res.json())
+        .then(agents => {
+            const agentsList = document.getElementById('agents-list');
+            agentsList.innerHTML = agents.map(agent => `
+                <div class="d-flex justify-content-between align-items-center mb-2 p-2 border rounded">
+                    <div>
+                        <strong>${agent.name}</strong><br>
+                        <small class="text-muted">${agent.ip}</small>
+                    </div>
+                    <span class="badge ${agent.status === 'active' ? 'bg-success' : 'bg-secondary'}">
+                        ${agent.status === 'active' ? 'Active' : 'Inactive'}
+                    </span>
+                </div>
+            `).join('');
+        });
+
+    // โหลดสถิติเริ่มต้น
+    fetch('/api/stats')
+        .then(res => res.json())
+        .then(stats => {
+            socket.emit('stats_update', stats);
+        });
+</script>
+{% endblock %}

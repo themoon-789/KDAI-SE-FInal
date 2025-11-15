@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}VirusTotal Scanner{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-4">🔍 VirusTotal Scanner</h2>
+    
+    <!-- Tabs -->
+    <ul class="nav nav-tabs mb-4" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" data-bs-toggle="tab" href="#url-scan">URL Scanner</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#hash-scan">File Hash</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" data-bs-toggle="tab" href="#ip-scan">IP Address</a>
+        </li>
+    </ul>
+
+    <!-- Tab Content -->
+    <div class="tab-content">
+        <!-- URL Scanner -->
+        <div id="url-scan" class="tab-pane fade show active">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Scan URL</h5>
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="url-input" 
+                               placeholder="Enter URL (e.g., https://example.com)">
+                    </div>
+                    <button class="btn btn-primary" onclick="scanURL()">
+                        <i class="bi bi-search"></i> Scan URL
+                    </button>
+                    <div id="url-result" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Hash Scanner -->
+        <div id="hash-scan" class="tab-pane fade">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Check File Hash</h5>
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="hash-input" 
+                               placeholder="Enter MD5, SHA1, or SHA256 hash">
+                    </div>
+                    <button class="btn btn-primary" onclick="scanHash()">
+                        <i class="bi bi-search"></i> Check Hash
+                    </button>
+                    <div id="hash-result" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- IP Scanner -->
+        <div id="ip-scan" class="tab-pane fade">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Check IP Address</h5>
+                    <div class="mb-3">
+                        <input type="text" class="form-control" id="ip-input" 
+                               placeholder="Enter IP address (e.g., 8.8.8.8)">
+                    </div>
+                    <button class="btn btn-primary" onclick="scanIP()">
+                        <i class="bi bi-search"></i> Check IP
+                    </button>
+                    <div id="ip-result" class="mt-3"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Example Hashes -->
+    <div class="card mt-4">
+        <div class="card-body">
+            <h5 class="card-title">📝 Test Examples</h5>
+            <p><strong>Known Malware Hash (EICAR test):</strong></p>
+            <code>275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f</code>
+            <button class="btn btn-sm btn-outline-primary ms-2" 
+                    onclick="document.getElementById('hash-input').value='275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f'; document.querySelector('a[href=\'#hash-scan\']').click();">
+                Test This
+            </button>
+            
+            <p class="mt-3"><strong>Test URL:</strong></p>
+            <code>http://malware.testing.google.test/testing/malware/</code>
+            <button class="btn btn-sm btn-outline-primary ms-2" 
+                    onclick="document.getElementById('url-input').value='http://malware.testing.google.test/testing/malware/'; document.querySelector('a[href=\'#url-scan\']').click();">
+                Test This
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+function showLoading(elementId) {
+    document.getElementById(elementId).innerHTML = `
+        <div class="alert alert-info">
+            <div class="spinner-border spinner-border-sm me-2"></div>
+            Scanning... Please wait.
+        </div>
+    `;
+}
+
+function showError(elementId, message) {
+    document.getElementById(elementId).innerHTML = `
+        <div class="alert alert-danger">
+            <i class="bi bi-exclamation-triangle"></i> ${message}
+        </div>
+    `;
+}
+
+function getThreatBadge(level) {
+    const badges = {
+        'Critical': 'danger',
+        'High': 'warning',
+        'Medium': 'info',
+        'Safe': 'success'
+    };
+    return badges[level] || 'secondary';
+}
+
+async function scanURL() {
+    const url = document.getElementById('url-input').value.trim();
+    if (!url) {
+        showError('url-result', 'Please enter a URL');
+        return;
+    }
+
+    showLoading('url-result');
+
+    try {
+        const response = await fetch('/api/vt/scan-url', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url: url})
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            showError('url-result', data.error);
+            return;
+        }
+
+        document.getElementById('url-result').innerHTML = `
+            <div class="card">
+                <div class="card-body">
+                    <h5>Scan Results</h5>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-danger text-white rounded">
+                                <h3>${data.malicious}</h3>
+                                <small>Malicious</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-warning text-dark rounded">
+                                <h3>${data.suspicious}</h3>
+                                <small>Suspicious</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-success text-white rounded">
+                                <h3>${data.harmless}</h3>
+                                <small>Harmless</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-secondary text-white rounded">
+                                <h3>${data.undetected}</h3>
+                                <small>Undetected</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <span class="badge bg-${getThreatBadge(data.threat_level)} fs-5">
+                            Threat Level: ${data.threat_level}
+                        </span>
+                        <p class="mt-2">Total Scans: ${data.total_scans}</p>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        showError('url-result', 'Failed to scan URL: ' + error.message);
+    }
+}
+
+async function scanHash() {
+    const hash = document.getElementById('hash-input').value.trim();
+    if (!hash) {
+        showError('hash-result', 'Please enter a file hash');
+        return;
+    }
+
+    showLoading('hash-result');
+
+    try {
+        const response = await fetch('/api/vt/scan-hash', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({hash: hash})
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            showError('hash-result', data.error);
+            return;
+        }
+
+        if (data.status === 'not_found') {
+            document.getElementById('hash-result').innerHTML = `
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle"></i> File hash not found in VirusTotal database
+                </div>
+            `;
+            return;
+        }
+
+        document.getElementById('hash-result').innerHTML = `
+            <div class="card">
+                <div class="card-body">
+                    <h5>File Information</h5>
+                    <p><strong>File Name:</strong> ${data.file_name}</p>
+                    <p><strong>File Type:</strong> ${data.file_type}</p>
+                    <p><strong>Size:</strong> ${(data.size / 1024).toFixed(2)} KB</p>
+                    
+                    <h5 class="mt-3">Detection Results</h5>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-danger text-white rounded">
+                                <h3>${data.malicious}</h3>
+                                <small>Malicious</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-warning text-dark rounded">
+                                <h3>${data.suspicious}</h3>
+                                <small>Suspicious</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-success text-white rounded">
+                                <h3>${data.harmless}</h3>
+                                <small>Harmless</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-secondary text-white rounded">
+                                <h3>${data.undetected}</h3>
+                                <small>Undetected</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <span class="badge bg-${getThreatBadge(data.threat_level)} fs-5">
+                            Threat Level: ${data.threat_level}
+                        </span>
+                        <p class="mt-2">Total Scans: ${data.total_scans}</p>
+                    </div>
+                    
+                    <h5 class="mt-3">Hashes</h5>
+                    <p><small><strong>SHA256:</strong> ${data.sha256}</small></p>
+                    <p><small><strong>MD5:</strong> ${data.md5}</small></p>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        showError('hash-result', 'Failed to check hash: ' + error.message);
+    }
+}
+
+async function scanIP() {
+    const ip = document.getElementById('ip-input').value.trim();
+    if (!ip) {
+        showError('ip-result', 'Please enter an IP address');
+        return;
+    }
+
+    showLoading('ip-result');
+
+    try {
+        const response = await fetch('/api/vt/scan-ip', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ip: ip})
+        });
+
+        const data = await response.json();
+
+        if (data.error) {
+            showError('ip-result', data.error);
+            return;
+        }
+
+        document.getElementById('ip-result').innerHTML = `
+            <div class="card">
+                <div class="card-body">
+                    <h5>IP Information</h5>
+                    <p><strong>IP Address:</strong> ${data.ip}</p>
+                    <p><strong>Country:</strong> ${data.country}</p>
+                    <p><strong>AS Owner:</strong> ${data.as_owner}</p>
+                    
+                    <h5 class="mt-3">Detection Results</h5>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-danger text-white rounded">
+                                <h3>${data.malicious}</h3>
+                                <small>Malicious</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-warning text-dark rounded">
+                                <h3>${data.suspicious}</h3>
+                                <small>Suspicious</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-success text-white rounded">
+                                <h3>${data.harmless}</h3>
+                                <small>Harmless</small>
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <div class="text-center p-3 bg-secondary text-white rounded">
+                                <h3>${data.undetected}</h3>
+                                <small>Undetected</small>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="mt-3">
+                        <span class="badge bg-${getThreatBadge(data.threat_level)} fs-5">
+                            Threat Level: ${data.threat_level}
+                        </span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } catch (error) {
+        showError('ip-result', 'Failed to check IP: ' + error.message);
+    }
+}
+</script>
+{% endblock %}

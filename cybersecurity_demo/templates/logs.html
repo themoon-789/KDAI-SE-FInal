@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+
+{% block title %}Log Management - Cybersecurity Agent{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="text-white mb-4"><i class="bi bi-file-text"></i> Log Management</h1>
+    <p class="text-white-50">UC-ADM-02: จัดการและวิเคราะห์ Syslog จากอุปกรณ์ต่างๆ</p>
+
+    <div class="row mb-3">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-funnel"></i> ตัวกรอง</h5>
+                    <div>
+                        <button class="btn btn-sm btn-success" onclick="loadGraylogLogs()">
+                            <i class="bi bi-cloud-download"></i> Graylog Logs
+                        </button>
+                        <button class="btn btn-sm btn-light" onclick="loadLogs()">
+                            <i class="bi bi-arrow-clockwise"></i> รีเฟรช
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div class="row mb-3">
+                        <div class="col-md-12">
+                            <div class="btn-group w-100" role="group">
+                                <input type="radio" class="btn-check" name="log-source" id="source-local" value="local" checked>
+                                <label class="btn btn-outline-primary" for="source-local">
+                                    <i class="bi bi-hdd"></i> Local Logs
+                                </label>
+                                
+                                <input type="radio" class="btn-check" name="log-source" id="source-graylog" value="graylog">
+                                <label class="btn btn-outline-success" for="source-graylog">
+                                    <i class="bi bi-cloud"></i> Graylog (FortiGate)
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label class="form-label small">ช่วงเวลา (นาที)</label>
+                            <input type="number" class="form-control" id="time-range" value="5" min="1" max="1440">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small">จำนวน Logs</label>
+                            <input type="number" class="form-control" id="log-limit" value="50" min="10" max="1000">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small">ระดับความรุนแรง</label>
+                            <select class="form-select" id="filter-severity">
+                                <option value="">ทุกระดับ</option>
+                                <option value="INFO">INFO</option>
+                                <option value="WARNING">WARNING</option>
+                                <option value="CRITICAL">CRITICAL</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small">&nbsp;</label>
+                            <button class="btn btn-primary w-100" onclick="loadLogsWithFilters()">
+                                <i class="bi bi-search"></i> ค้นหา
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0"><i class="bi bi-list-ul"></i> รายการ Logs</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive" style="max-height: 500px; overflow-y: auto;">
+                        <table class="table table-hover table-sm">
+                            <thead class="table-light sticky-top">
+                                <tr>
+                                    <th style="width: 15%">เวลา</th>
+                                    <th style="width: 15%">แหล่งที่มา</th>
+                                    <th style="width: 10%">ระดับ</th>
+                                    <th style="width: 60%">ข้อความ</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logs-table">
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">
+                                        <i class="bi bi-hourglass-split"></i> กำลังโหลด...
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-pie-chart"></i> สถิติตามระดับ</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><span class="badge bg-info">INFO</span></span>
+                        <strong id="stat-info">0</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span><span class="badge bg-warning">WARNING</span></span>
+                        <strong id="stat-warning">0</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span><span class="badge bg-danger">CRITICAL</span></span>
+                        <strong id="stat-critical">0</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-hdd-network"></i> สถิติตามแหล่งที่มา</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Firewall-01</span>
+                        <strong id="stat-firewall">0</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Windows-Server-01</span>
+                        <strong id="stat-windows">0</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Router-01</span>
+                        <strong id="stat-router">0</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-clock-history"></i> ข้อมูลล่าสุด</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Logs ทั้งหมด:</strong> <span id="total-logs">0</span></p>
+                    <p><strong>อัปเดตล่าสุด:</strong> <span id="last-update">-</span></p>
+                    <p><strong>Auto-refresh:</strong> <span class="badge bg-success">ON</span></p>
+                    <hr>
+                    <button class="btn btn-primary btn-sm w-100 mb-2" onclick="aiAnalyzeGraylogLogs()">
+                        <i class="bi bi-robot"></i> 🤖 AI วิเคราะห์ Logs
+                    </button>
+                    <button class="btn btn-warning btn-sm w-100 mb-2" onclick="analyzeGraylogLogs()">
+                        <i class="bi bi-graph-up"></i> วิเคราะห์ Graylog
+                    </button>
+                    <button class="btn btn-danger btn-sm w-100" onclick="getSecurityEvents()">
+                        <i class="bi bi-shield-exclamation"></i> Security Events
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let allLogs = [];
+
+    function loadLogs() {
+        fetch('/api/logs?limit=100')
+            .then(res => res.json())
+            .then(logs => {
+                allLogs = logs.reverse(); // ใหม่สุดก่อน
+                displayLogs(allLogs);
+                updateStats(allLogs);
+            });
+    }
+
+    function loadLogsWithFilters() {
+        const source = document.querySelector('input[name="log-source"]:checked').value;
+        const minutes = document.getElementById('time-range').value;
+        const limit = document.getElementById('log-limit').value;
+        
+        let url = `/api/logs?limit=${limit}`;
+        
+        if (source === 'graylog') {
+            url += `&source=graylog&minutes=${minutes}`;
+        }
+        
+        fetch(url)
+            .then(res => res.json())
+            .then(logs => {
+                if (logs.error) {
+                    alert('Error: ' + logs.error);
+                    return;
+                }
+                allLogs = logs.reverse(); // ใหม่สุดก่อน
+                displayLogs(allLogs);
+                updateStats(allLogs);
+            })
+            .catch(err => {
+                alert('Failed to load logs: ' + err);
+            });
+    }
+
+    function loadGraylogLogs() {
+        document.getElementById('source-graylog').checked = true;
+        loadLogsWithFilters();
+    }
+
+    function displayLogs(logs) {
+        const tbody = document.getElementById('logs-table');
+        
+        if (logs.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="4" class="text-center text-muted">
+                        <i class="bi bi-inbox"></i> ไม่พบข้อมูล
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        const severityClass = {
+            'INFO': 'bg-info',
+            'info': 'bg-info',
+            'information': 'bg-info',
+            '6': 'bg-info',
+            'WARNING': 'bg-warning',
+            'warning': 'bg-warning',
+            '4': 'bg-warning',
+            'CRITICAL': 'bg-danger',
+            'critical': 'bg-danger',
+            'notice': 'bg-primary',
+            '5': 'bg-primary'
+        };
+
+        tbody.innerHTML = logs.map(log => {
+            const level = log.level || log.severity || 'INFO';
+            const levelClass = severityClass[level] || 'bg-secondary';
+            const timestamp = new Date(log.timestamp).toLocaleString('th-TH');
+            const source = log.source || 'Unknown';
+            const message = log.message || 'N/A';
+            const ip = log.ip || '';
+            
+            return `
+                <tr>
+                    <td><small>${timestamp}</small></td>
+                    <td>
+                        <span class="badge bg-secondary">${source}</span>
+                        ${ip ? `<br><small class="text-muted">${ip}</small>` : ''}
+                    </td>
+                    <td><span class="badge ${levelClass}">${level}</span></td>
+                    <td><small>${message}</small></td>
+                </tr>
+            `;
+        }).join('');
+
+        if (document.getElementById('last-update')) {
+            document.getElementById('last-update').textContent = new Date().toLocaleString('th-TH');
+        }
+    }
+
+    function updateStats(logs) {
+        document.getElementById('total-logs').textContent = logs.length;
+
+        // นับตามระดับ
+        const info = logs.filter(l => l.severity === 'INFO').length;
+        const warning = logs.filter(l => l.severity === 'WARNING').length;
+        const critical = logs.filter(l => l.severity === 'CRITICAL').length;
+
+        document.getElementById('stat-info').textContent = info;
+        document.getElementById('stat-warning').textContent = warning;
+        document.getElementById('stat-critical').textContent = critical;
+
+        // นับตามแหล่งที่มา
+        const firewall = logs.filter(l => l.source === 'Firewall-01').length;
+        const windows = logs.filter(l => l.source === 'Windows-Server-01').length;
+        const router = logs.filter(l => l.source === 'Router-01').length;
+
+        document.getElementById('stat-firewall').textContent = firewall;
+        document.getElementById('stat-windows').textContent = windows;
+        document.getElementById('stat-router').textContent = router;
+    }
+
+    function applyFilters() {
+        const severity = document.getElementById('filter-severity').value;
+        const source = document.getElementById('filter-source').value;
+        const search = document.getElementById('filter-search').value.toLowerCase();
+
+        let filtered = allLogs;
+
+        if (severity) {
+            filtered = filtered.filter(log => log.severity === severity);
+        }
+
+        if (source) {
+            filtered = filtered.filter(log => log.source === source);
+        }
+
+        if (search) {
+            filtered = filtered.filter(log => 
+                log.message.toLowerCase().includes(search) ||
+                log.source.toLowerCase().includes(search)
+            );
+        }
+
+        displayLogs(filtered);
+    }
+
+    // โหลดข้อมูลเริ่มต้น
+    loadLogs();
+
+    function analyzeGraylogLogs() {
+        const minutes = document.getElementById('time-range').value || 60;
+        
+        fetch(`/api/graylog/analyze?minutes=${minutes}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    const analysis = data.analysis;
+                    let message = `📊 Graylog Analysis (${minutes} minutes)\n\n`;
+                    message += `Total Logs: ${analysis.total}\n\n`;
+                    message += `Severity:\n${JSON.stringify(analysis.severity_counts, null, 2)}\n\n`;
+                    message += `Event Types:\n${JSON.stringify(analysis.event_types, null, 2)}\n\n`;
+                    message += `Top Sources:\n${analysis.top_sources.slice(0, 5).map(([ip, count]) => `${ip}: ${count}`).join('\n')}`;
+                    
+                    alert(message);
+                } else {
+                    alert('No logs found for analysis');
+                }
+            })
+            .catch(err => {
+                alert('Failed to analyze logs: ' + err);
+            });
+    }
+
+    function aiAnalyzeGraylogLogs() {
+        const minutes = document.getElementById('time-range').value || 30;
+        const maxLogs = 50;
+        
+        // แสดง loading
+        const loadingMsg = `🤖 กำลังวิเคราะห์ logs ด้วย AI...\n\nกรุณารอสักครู่ (อาจใช้เวลา 10-30 วินาที)`;
+        alert(loadingMsg);
+        
+        fetch(`/api/graylog/ai-analyze?minutes=${minutes}&max_logs=${maxLogs}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    // แสดงผลการวิเคราะห์ใน modal หรือ alert
+                    const analysis = data.analysis;
+                    const summary = `🤖 AI Analysis Results\n\n` +
+                                  `📊 Logs Analyzed: ${data.logs_analyzed} logs\n` +
+                                  `⏱️ Time Range: ${data.time_range_minutes} minutes\n` +
+                                  `🧠 Model: ${data.model}\n\n` +
+                                  `${'-'.repeat(50)}\n\n` +
+                                  `${analysis}`;
+                    
+                    // สร้าง modal แสดงผล
+                    showAnalysisModal(summary);
+                } else {
+                    alert('❌ Failed to analyze logs: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(err => {
+                alert('❌ Failed to analyze logs with AI: ' + err);
+            });
+    }
+    
+    function showAnalysisModal(content) {
+        // สร้าง modal แสดงผลการวิเคราะห์
+        const modal = document.createElement('div');
+        modal.className = 'modal fade';
+        modal.id = 'aiAnalysisModal';
+        modal.innerHTML = `
+            <div class="modal-dialog modal-lg modal-dialog-scrollable">
+                <div class="modal-content">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title">🤖 AI Log Analysis</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <pre style="white-space: pre-wrap; font-family: 'Sarabun', sans-serif;">${content}</pre>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        const bsModal = new bootstrap.Modal(modal);
+        bsModal.show();
+        
+        // ลบ modal เมื่อปิด
+        modal.addEventListener('hidden.bs.modal', function () {
+            modal.remove();
+        });
+    }
+
+    function getSecurityEvents() {
+        const hours = 1;
+        
+        fetch(`/api/graylog/security-events?hours=${hours}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert(`🔒 Found ${data.count} security events in the last ${hours} hour(s)`);
+                    
+                    // แสดง events
+                    if (data.events.length > 0) {
+                        allLogs = data.events;
+                        displayLogs(allLogs);
+                    }
+                } else {
+                    alert('Failed to get security events');
+                }
+            })
+            .catch(err => {
+                alert('Failed to get security events: ' + err);
+            });
+    }
+
+    // Auto-refresh ทุก 10 วินาที
+    setInterval(loadLogs, 10000);
+</script>
+{% endblock %}

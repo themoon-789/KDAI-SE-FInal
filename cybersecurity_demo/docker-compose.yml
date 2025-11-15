@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  # Web Application
+  app:
+    build: .
+    container_name: cybersecurity_app
+    ports:
+      - "5001:5001"
+      - "514:514/udp"
+    environment:
+      - FLASK_ENV=production
+      - DATABASE_URL=postgresql://cyberuser:cyberpass@db:5432/cybersecurity
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-change-me-in-production}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - OPENROUTER_MODEL=${OPENROUTER_MODEL:-google/gemini-2.0-flash-exp:free}
+    volumes:
+      - ./uploads:/app/uploads
+      - ./data:/app/data
+      - ./logs:/app/logs
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # PostgreSQL Database
+  db:
+    image: postgres:15-alpine
+    container_name: cybersecurity_db
+    environment:
+      - POSTGRES_DB=cybersecurity
+      - POSTGRES_USER=cyberuser
+      - POSTGRES_PASSWORD=cyberpass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy (Optional)
+  nginx:
+    image: nginx:alpine
+    container_name: cybersecurity_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

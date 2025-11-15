@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+
+{% block title %}AI Chat - Cybersecurity Agent{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h1 class="text-white mb-4"><i class="bi bi-robot"></i> AI Security Assistant</h1>
+    <p class="text-white-50">UC-ADM-04: ถามตอบกับ AI เกี่ยวกับความมั่นคงปลอดภัยทางไซเบอร์</p>
+
+    <div class="row">
+        <div class="col-md-8">
+            <div class="card" style="height: 600px; display: flex; flex-direction: column;">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-chat-dots"></i> Chat</h5>
+                    <div>
+                        <span class="badge bg-success" id="ai-status">
+                            <i class="bi bi-circle-fill"></i> <span id="model-name">Loading...</span>
+                        </span>
+                    </div>
+                </div>
+                <div class="card-body" style="flex: 1; overflow-y: auto; background: #f8f9fa;" id="chat-messages">
+                    <div class="text-center text-muted py-5">
+                        <i class="bi bi-chat-square-text" style="font-size: 3rem;"></i>
+                        <p class="mt-3">เริ่มสนทนากับ AI Security Assistant</p>
+                        <small>ถามคำถามเกี่ยวกับความมั่นคงปลอดภัยทางไซเบอร์</small>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <form id="chat-form">
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="user-message" 
+                                   placeholder="พิมพ์คำถามของคุณ..." autocomplete="off" required>
+                            <button type="submit" class="btn btn-primary" id="send-btn">
+                                <i class="bi bi-send"></i> ส่ง
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-gear"></i> Settings</h6>
+                </div>
+                <div class="card-body">
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" id="use-rag" checked>
+                        <label class="form-check-label" for="use-rag">
+                            <i class="bi bi-database"></i> Enable RAG
+                        </label>
+                    </div>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="use-exploitdb">
+                        <label class="form-check-label" for="use-exploitdb">
+                            <i class="bi bi-book"></i> Use Exploit-DB Papers
+                            <span class="badge bg-success">NEW</span>
+                        </label>
+                        <small class="text-muted d-block">Search from 1,600+ security papers</small>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-info-circle"></i> AI Model Info</h6>
+                </div>
+                <div class="card-body">
+                    <p><strong>Model:</strong> <span id="info-model">-</span></p>
+                    <p><strong>Provider:</strong> <span id="info-provider">-</span></p>
+                    <p><strong>Type:</strong> <span id="info-type">-</span></p>
+                    <p><strong>Status:</strong> <span id="info-status" class="badge bg-success">Active</span></p>
+                    <hr>
+                    <p><strong>RAG:</strong> <span id="info-rag" class="badge bg-info">Enabled</span></p>
+                    <p><strong>Vector Store:</strong> <span id="info-vector">-</span></p>
+                    <p><strong>Documents:</strong> <span id="info-docs">0</span></p>
+                    <p class="mb-0"><strong>Chunks:</strong> <span id="info-chunks">0</span></p>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-lightbulb"></i> ตัวอย่างคำถาม</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-primary btn-sm text-start sample-question">
+                            <i class="bi bi-question-circle"></i> What is SQL injection?
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm text-start sample-question">
+                            <i class="bi bi-question-circle"></i> Explain buffer overflow exploitation
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm text-start sample-question">
+                            <i class="bi bi-question-circle"></i> How does XSS attack work?
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm text-start sample-question">
+                            <i class="bi bi-question-circle"></i> What are J2EE vulnerabilities?
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm text-start sample-question">
+                            <i class="bi bi-question-circle"></i> Explain privilege escalation techniques
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h6 class="mb-0"><i class="bi bi-shield-check"></i> Quick Actions</h6>
+                </div>
+                <div class="card-body">
+                    <button class="btn btn-warning btn-sm w-100 mb-2" id="analyze-logs-btn">
+                        <i class="bi bi-search"></i> วิเคราะห์ Logs ล่าสุด
+                    </button>
+                    <button class="btn btn-info btn-sm w-100" id="clear-chat-btn">
+                        <i class="bi bi-trash"></i> ล้างประวัติการสนทนา
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    let chatHistory = [];
+
+    // โหลดข้อมูล AI Model และ Vector Store
+    fetch('/api/ai-info')
+        .then(res => res.json())
+        .then(info => {
+            document.getElementById('model-name').textContent = info.model || 'Unknown';
+            document.getElementById('info-model').textContent = info.model || '-';
+            document.getElementById('info-provider').textContent = info.provider || '-';
+            document.getElementById('info-type').textContent = info.type || '-';
+            
+            if (info.status === 'active') {
+                document.getElementById('info-status').className = 'badge bg-success';
+                document.getElementById('info-status').textContent = 'Active';
+            } else {
+                document.getElementById('info-status').className = 'badge bg-danger';
+                document.getElementById('info-status').textContent = 'Inactive';
+            }
+            
+            // แสดงข้อมูล RAG
+            if (info.rag_enabled) {
+                document.getElementById('info-rag').className = 'badge bg-success';
+                document.getElementById('info-rag').textContent = 'Enabled';
+                document.getElementById('info-vector').textContent = info.vector_store || '-';
+                document.getElementById('info-docs').textContent = info.total_documents || 0;
+                document.getElementById('info-chunks').textContent = info.total_chunks || 0;
+            } else {
+                document.getElementById('info-rag').className = 'badge bg-warning';
+                document.getElementById('info-rag').textContent = 'Disabled';
+            }
+        })
+        .catch(err => {
+            console.error('Failed to load AI info:', err);
+            document.getElementById('ai-status').className = 'badge bg-danger';
+            document.getElementById('model-name').textContent = 'Error';
+        });
+
+    // ฟังก์ชันเพิ่มข้อความใน chat
+    function addMessage(message, isUser = false) {
+        const chatMessages = document.getElementById('chat-messages');
+        
+        // ลบข้อความเริ่มต้น
+        if (chatHistory.length === 0) {
+            chatMessages.innerHTML = '';
+        }
+
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `mb-3 ${isUser ? 'text-end' : ''}`;
+        
+        const bubble = document.createElement('div');
+        bubble.className = `d-inline-block p-3 rounded ${isUser ? 'bg-primary text-white' : 'bg-white border'}`;
+        bubble.style.maxWidth = '80%';
+        bubble.style.textAlign = 'left';
+        
+        // แปลง markdown-style formatting
+        let formattedMessage = message
+            .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            .replace(/\n/g, '<br>');
+        
+        bubble.innerHTML = `
+            <div class="mb-1">
+                <small class="text-muted">
+                    <i class="bi bi-${isUser ? 'person' : 'robot'}"></i>
+                    ${isUser ? 'You' : 'AI Assistant'}
+                </small>
+            </div>
+            <div>${formattedMessage}</div>
+            <div class="mt-1">
+                <small class="text-muted">${new Date().toLocaleTimeString('th-TH')}</small>
+            </div>
+        `;
+        
+        messageDiv.appendChild(bubble);
+        chatMessages.appendChild(messageDiv);
+        
+        // Scroll to bottom
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+        
+        chatHistory.push({ message, isUser, timestamp: new Date() });
+    }
+
+    // ส่งข้อความ
+    document.getElementById('chat-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const input = document.getElementById('user-message');
+        const message = input.value.trim();
+        
+        if (!message) return;
+        
+        // แสดงข้อความของผู้ใช้
+        addMessage(message, true);
+        input.value = '';
+        
+        // ปิดปุ่มส่ง
+        const sendBtn = document.getElementById('send-btn');
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> กำลังคิด...';
+        
+        try {
+            // ดึงค่า settings
+            const useRag = document.getElementById('use-rag').checked;
+            const useExploitdb = document.getElementById('use-exploitdb').checked;
+            
+            // ส่งไปยัง API
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    message,
+                    use_rag: useRag,
+                    use_exploitdb: useExploitdb
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                // แสดงคำตอบ
+                addMessage(data.response, false);
+                
+                // แสดง badge ถ้าใช้ Exploit-DB
+                if (data.exploitdb_enabled) {
+                    const chatMessages = document.getElementById('chat-messages');
+                    const lastMessage = chatMessages.lastElementChild;
+                    const badge = '<span class="badge bg-success ms-2"><i class="bi bi-book"></i> Exploit-DB</span>';
+                    lastMessage.querySelector('.d-inline-block').insertAdjacentHTML('afterbegin', badge);
+                }
+                
+                // แสดง sources ถ้ามี
+                if (data.sources && data.sources.length > 0) {
+                    let sourcesHtml = '<div class="mt-2 p-2 bg-light border rounded"><small><strong>📚 Sources:</strong><br>';
+                    data.sources.forEach((source, i) => {
+                        const title = source.title || source.filename || 'Unknown';
+                        const score = source.relevance_score || source.score || 0;
+                        sourcesHtml += `${i+1}. ${title} (Score: ${(score * 100).toFixed(0)}%)<br>`;
+                    });
+                    sourcesHtml += '</small></div>';
+                    
+                    const chatMessages = document.getElementById('chat-messages');
+                    const lastMessage = chatMessages.lastElementChild;
+                    lastMessage.querySelector('.d-inline-block').insertAdjacentHTML('beforeend', sourcesHtml);
+                }
+                
+                // แสดงสถานะ RAG
+                if (data.context_used) {
+                    console.log('✅ RAG was used for this response');
+                }
+            } else {
+                addMessage('ขอโทษครับ เกิดข้อผิดพลาด: ' + (data.error || 'Unknown error'), false);
+            }
+        } catch (error) {
+            addMessage('ขอโทษครับ ไม่สามารถเชื่อมต่อกับ AI ได้: ' + error.message, false);
+        } finally {
+            // เปิดปุ่มส่งอีกครั้ง
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = '<i class="bi bi-send"></i> ส่ง';
+            input.focus();
+        }
+    });
+
+    // คำถามตัวอย่าง
+    document.querySelectorAll('.sample-question').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const question = this.textContent.trim().replace('?', '').trim();
+            document.getElementById('user-message').value = question;
+            document.getElementById('chat-form').dispatchEvent(new Event('submit'));
+        });
+    });
+
+    // วิเคราะห์ Logs
+    document.getElementById('analyze-logs-btn').addEventListener('click', async function() {
+        const btn = this;
+        btn.disabled = true;
+        btn.innerHTML = '<i class="bi bi-hourglass-split"></i> กำลังวิเคราะห์...';
+        
+        try {
+            // ดึง logs ล่าสุด
+            const logsResponse = await fetch('/api/logs?limit=10');
+            const logs = await logsResponse.json();
+            
+            if (logs.length === 0) {
+                addMessage('ไม่พบ Logs ที่จะวิเคราะห์', false);
+                return;
+            }
+            
+            // สร้างข้อความสำหรับวิเคราะห์
+            const criticalLogs = logs.filter(log => log.severity === 'CRITICAL');
+            const message = `Analyze these recent security logs: ${criticalLogs.length} critical events found. What should I be concerned about?`;
+            
+            document.getElementById('user-message').value = message;
+            document.getElementById('chat-form').dispatchEvent(new Event('submit'));
+        } catch (error) {
+            addMessage('เกิดข้อผิดพลาดในการวิเคราะห์ Logs', false);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-search"></i> วิเคราะห์ Logs ล่าสุด';
+        }
+    });
+
+    // ล้างประวัติ
+    document.getElementById('clear-chat-btn').addEventListener('click', function() {
+        if (confirm('ต้องการล้างประวัติการสนทนาทั้งหมดหรือไม่?')) {
+            chatHistory = [];
+            document.getElementById('chat-messages').innerHTML = `
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-chat-square-text" style="font-size: 3rem;"></i>
+                    <p class="mt-3">เริ่มสนทนากับ AI Security Assistant</p>
+                    <small>ถามคำถามเกี่ยวกับความมั่นคงปลอดภัยทางไซเบอร์</small>
+                </div>
+            `;
+        }
+    });
+
+    // Focus input on load
+    document.getElementById('user-message').focus();
+</script>
+{% endblock %}
